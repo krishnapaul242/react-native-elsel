@@ -312,12 +312,29 @@ const Selector = forwardRef<ElementSelectorHandle, Omit<ElementSelectorProps, 'e
       .reverse();
   }, [inspection, showLibraries]);
 
+  // Step to the nearest visible crumb in that direction; when every level in
+  // between is hidden library code, step one level so it never gets stuck.
+  const [parentIndex, childIndex] = useMemo(() => {
+    if (!inspection) return [undefined, undefined];
+    const { selected, entries } = inspection;
+    const visible = new Set(crumbs.map((c) => c.index));
+    let parent: number | undefined;
+    for (let i = selected + 1; i < entries.length && parent === undefined; i++) if (visible.has(i)) parent = i;
+    let child: number | undefined;
+    for (let i = selected - 1; i >= 0 && child === undefined; i--) if (visible.has(i)) child = i;
+    return [
+      parent ?? (selected + 1 < entries.length ? selected + 1 : undefined),
+      child ?? (selected > 0 ? selected - 1 : undefined),
+    ];
+  }, [inspection, crumbs]);
+
   const open = useCallback(async () => {
     const src = selection?.element.source;
     if (!src) return;
     try {
-      const res = await postJson('/__elsel/open', { file: src.file, line: src.line, column: src.column });
-      if (res.status === 404) await postJson('/open-stack-frame', { file: src.file, lineNumber: src.line });
+      const res = await postJson<{ error?: string }>('/__elsel/open', { file: src.file, line: src.line, column: src.column });
+      if (res.status === 404 && !res.data?.error) await postJson('/open-stack-frame', { file: src.file, lineNumber: src.line });
+      else if (res.status !== 200) return flash(res.data?.error ?? 'Could not open the editor');
       flash(`Opened ${formatPath(src.file)}:${src.line}`);
     } catch {
       flash(`Could not reach Metro at ${devServerUrl()}`);
@@ -380,6 +397,8 @@ const Selector = forwardRef<ElementSelectorHandle, Omit<ElementSelectorProps, 'e
                 element={selection.element}
                 crumbs={crumbs}
                 selectedIndex={inspection.selected}
+                parentIndex={parentIndex}
+                childIndex={childIndex}
                 showLibraries={showLibraries}
                 placement={placement}
                 maxHeight={window.height * 0.48}

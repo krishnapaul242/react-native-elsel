@@ -5,13 +5,16 @@ import type { SourceLocation } from './types';
 type RawFrame = { methodName: string; file: string; lineNumber: number; column: number };
 
 // Frames inside React itself (jsxDEV, createElement, ...) are never the
-// place the element was written.
-const REACT_INTERNAL = /node_modules[\\/](react|react-dom)[\\/]|react-jsx-(dev-)?runtime|Libraries[\\/]Renderer[\\/]/;
+// place the element was written. Neither are custom JSX runtimes that wrap
+// React's (jsxImportSource): NativeWind / react-native-css-interop, Emotion,
+// theme-ui and friends would otherwise claim every element in the app.
+const REACT_INTERNAL =
+  /node_modules[\\/](react|react-dom)[\\/]|jsx-(dev-)?runtime|react-native-css-interop[\\/].*[\\/]wrap-jsx|Libraries[\\/]Renderer[\\/]/;
 
 const V8_HERMES = /^\s*at (?:(.+?) \()?(?:address at )?(.+?):(\d+):(\d+)\)?\s*$/;
 const JSC_FIREFOX = /^(?:(.*?)@)?(.+?):(\d+):(\d+)$/;
 
-export function parseStack(stack: string, max = 6): RawFrame[] {
+export function parseStack(stack: string, max = 10): RawFrame[] {
   const frames: RawFrame[] = [];
   for (const line of stack.split('\n')) {
     const m = line.match(V8_HERMES) ?? line.trim().match(JSC_FIREFOX);

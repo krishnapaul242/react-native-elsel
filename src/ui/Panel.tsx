@@ -10,6 +10,8 @@ type Props = {
   element: SelectedElement;
   crumbs: Crumb[]; // root -> leaf
   selectedIndex: number;
+  parentIndex?: number;
+  childIndex?: number;
   showLibraries: boolean;
   placement: 'top' | 'bottom';
   maxHeight: number;
@@ -25,7 +27,7 @@ type Props = {
 };
 
 export function Panel(props: Props) {
-  const { element, crumbs, selectedIndex, placement } = props;
+  const { element, crumbs, selectedIndex, parentIndex, childIndex, placement } = props;
   const crumbScroll = React.useRef<React.ComponentRef<typeof ScrollView>>(null);
   const source = element.source;
   const styleEntries = Object.entries(element.style ?? {});
@@ -41,6 +43,8 @@ export function Panel(props: Props) {
           {element.name}
           <Text style={styles.bracket}>{'>'}</Text>
         </Text>
+        <Chip label="↑ Parent" onPress={() => parentIndex !== undefined && props.onSelectCrumb(parentIndex)} disabled={parentIndex === undefined} />
+        <Chip label="↓ Child" onPress={() => childIndex !== undefined && props.onSelectCrumb(childIndex)} disabled={childIndex === undefined} />
         <Chip label={props.showLibraries ? 'libs on' : 'libs off'} onPress={props.onToggleLibraries} active={props.showLibraries} />
         <Pressable onPress={props.onClose} hitSlop={10} style={styles.close}>
           <Text style={styles.closeText}>✕</Text>
@@ -147,9 +151,14 @@ function Action({ label, onPress, primary, disabled }: { label: string; onPress:
   );
 }
 
-function Chip({ label, onPress, active }: { label: string; onPress: () => void; active: boolean }) {
+function Chip({ label, onPress, active, disabled }: { label: string; onPress: () => void; active?: boolean; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} hitSlop={6} style={[styles.chip, active && { borderColor: colors.accent }]}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={6}
+      style={[styles.chip, active && { borderColor: colors.accent }, disabled && { opacity: 0.35 }]}
+    >
       <Text style={[styles.chipText, active && { color: colors.accent }]}>{label}</Text>
     </Pressable>
   );

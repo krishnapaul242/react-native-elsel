@@ -3,7 +3,7 @@
 A dev-only element selector for React Native and Expo. Tap the floating inspect button, then tap anything in your running app to see:
 
 - the component that rendered it and **the exact `file:line:column`** in your code
-- its component path (`Screen › Card › PrimaryButton › Text`), switchable level by level
+- its component path (`Screen › Card › PrimaryButton › Text`): tap any level, or step with **↑ Parent** / **↓ Child**
 - props, flattened style and on-screen layout
 
 From the panel you can **Open** the source in your editor, **Copy** a summary to your computer's clipboard, or **Send to AI**: elsel saves the selection, a code snippet and a simulator screenshot where Claude Code (or any agent) can read it.
