@@ -1,0 +1,61 @@
+{
+  "name": "react-native-elsel",
+  "version": "0.1.0",
+  "description": "Dev-only element selector for React Native. Right-click or long-press any element to see its component, source location, props and styles, open it in your editor, or hand it to an AI agent.",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "react-native": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./auto": {
+      "types": "./src/auto.tsx",
+      "react-native": "./src/auto.tsx",
+      "default": "./auto.js"
+    },
+    "./metro": "./metro.js",
+    "./transformer": "./transformer.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "elsel": "bin/elsel.js"
+  },
+  "files": [
+    "src",
+    "server",
+    "bin",
+    "auto.js",
+    "metro.js",
+    "transformer.js",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "inspector",
+    "element-selector",
+    "devtools",
+    "mcp"
+  ],
+  "peerDependencies": {
+    "react": ">=18",
+    "react-native": ">=0.74"
+  },
+  "dependencies": {
+    "launch-editor": "^2.14.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "react": "^19.2.3",
+    "react-native": "^0.87.1",
+    "typescript": "^5.9.3"
+  }
+}
