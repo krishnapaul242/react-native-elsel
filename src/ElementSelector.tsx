@@ -17,6 +17,7 @@ import { hitTest, measureFiber, measureRef } from './inspect';
 import { flattenStyle, serializeProps } from './serialize';
 import { resolveSources } from './source';
 import type { ChainEntry, Frame, Selection } from './types';
+import { FloatingButton } from './ui/FloatingButton';
 import { Highlight } from './ui/Highlight';
 import { Panel, type Crumb } from './ui/Panel';
 import { colors } from './ui/theme';
@@ -27,9 +28,16 @@ export type ElementSelectorProps = {
   children: React.ReactNode;
   /** Defaults to `__DEV__`. When false, children render untouched. */
   enabled?: boolean;
+  /** Draggable on-screen button that enters pick mode. Default true. */
+  button?: boolean;
   /** Secondary-button pointer events (mouse right-click). Default true. */
   rightClick?: boolean;
-  /** Press-and-hold to inspect. Default `{ duration: 600, touches: 1 }`. */
+  /**
+   * Press-and-hold to inspect. Off by default: a single-finger hold that never
+   * moves can't be taken from the app's own button, so it may still fire
+   * `onPress` on release. `{ touches: 2 }` is always clean. `true` means
+   * `{ duration: 600, touches: 1 }`.
+   */
   longPress?: boolean | LongPressOptions;
   /** Add "Inspect Element (elsel)" to the React Native Dev Menu. Default true. */
   devMenu?: boolean;
@@ -75,7 +83,7 @@ export const ElementSelector = forwardRef<ElementSelectorHandle, ElementSelector
 });
 
 const Selector = forwardRef<ElementSelectorHandle, Omit<ElementSelectorProps, 'enabled'>>(function Selector(
-  { children, rightClick = true, longPress = true, devMenu = true, devServerUrl: serverUrl, onSelect },
+  { children, button = true, rightClick = true, longPress = false, devMenu = true, devServerUrl: serverUrl, onSelect },
   ref,
 ) {
   const window = useWindowDimensions();
@@ -226,17 +234,25 @@ const Selector = forwardRef<ElementSelectorHandle, Omit<ElementSelectorProps, 'e
     [inspectAt],
   );
 
-  // Long press, observed without becoming the responder so the app's own
-  // touch handling keeps working.
+  // Long press is observed without becoming the responder, so the app's own
+  // touch handling keeps working. Once it fires, the next move takes the touch
+  // over, which cancels the app's pending press. Multi-finger presses are taken
+  // over as soon as the extra finger lands.
   const lp = longPress === false || !active ? null : { duration: 600, touches: 1, ...(longPress === true ? {} : longPress) };
   const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const armed = useRef(false);
   const cancelPress = useCallback(() => {
     if (press.current) clearTimeout(press.current.timer);
     press.current = null;
   }, []);
+  const endPress = useCallback(() => {
+    cancelPress();
+    armed.current = false;
+  }, [cancelPress]);
   const onTouchStart = useCallback(
     (e: GestureResponderEvent) => {
       cancelPress();
+      armed.current = false;
       if (!lp || e.nativeEvent.touches.length !== lp.touches) return;
       const { pageX, pageY } = e.nativeEvent;
       press.current = {
@@ -244,6 +260,7 @@ const Selector = forwardRef<ElementSelectorHandle, Omit<ElementSelectorProps, 'e
         y: pageY,
         timer: setTimeout(() => {
           press.current = null;
+          armed.current = true;
           inspectAt(pageX, pageY);
         }, lp.duration),
       };
@@ -258,6 +275,11 @@ const Selector = forwardRef<ElementSelectorHandle, Omit<ElementSelectorProps, 'e
     [cancelPress],
   );
   useEffect(() => cancelPress, [cancelPress]);
+  const claimOnStart = useCallback(
+    (e: GestureResponderEvent) => !!lp && lp.touches > 1 && e.nativeEvent.touches.length >= lp.touches,
+    [lp?.touches],
+  );
+  const claimOnMove = useCallback(() => armed.current, []);
 
   const selectCrumb = useCallback(
     async (index: number) => {
@@ -340,8 +362,12 @@ const Selector = forwardRef<ElementSelectorHandle, Omit<ElementSelectorProps, 'e
           onPointerDown={rightClick && active ? onPointerDown : undefined}
           onTouchStart={lp ? onTouchStart : undefined}
           onTouchMove={lp ? onTouchMove : undefined}
-          onTouchEnd={lp ? cancelPress : undefined}
-          onTouchCancel={lp ? cancelPress : undefined}
+          onTouchEnd={lp ? endPress : undefined}
+          onTouchCancel={lp ? endPress : undefined}
+          onStartShouldSetResponderCapture={lp ? claimOnStart : undefined}
+          onMoveShouldSetResponderCapture={lp ? claimOnMove : undefined}
+          onResponderRelease={lp ? endPress : undefined}
+          onResponderTerminate={lp ? endPress : undefined}
         >
           {children}
         </View>
@@ -384,6 +410,10 @@ const Selector = forwardRef<ElementSelectorHandle, Omit<ElementSelectorProps, 'e
               </Pressable>
             </View>
           </View>
+        )}
+
+        {active && button && mode === 'idle' && (
+          <FloatingButton width={window.width} height={window.height} onPress={() => setMode('picking')} />
         )}
 
         {mode !== 'inspecting' && status && (

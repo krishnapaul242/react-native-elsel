@@ -1,6 +1,6 @@
 # react-native-elsel
 
-A dev-only element selector for React Native and Expo. Right-click or long-press anything in your running app to see:
+A dev-only element selector for React Native and Expo. Tap the floating inspect button, then tap anything in your running app to see:
 
 - the component that rendered it and **the exact `file:line:column`** in your code
 - its component path (`Screen › Card › PrimaryButton › Text`), switchable level by level
@@ -30,8 +30,6 @@ Then restart Metro with `--clear`. **No app code changes.** `init`:
 
 It is safe to re-run. Flags: `--skip-install`, `--from <tarball|path|version>`.
 
-Not on npm yet? Run `npm pack` in this repo, then `npx ./react-native-elsel-0.1.0.tgz init --from ./react-native-elsel-0.1.0.tgz`. Don't install it with a symlink (`npm install ../elsel`): that pulls in this repo's own `react` / `react-native` dev copies and causes duplicate-React errors.
-
 ### How the zero-code wrap works
 
 In **development bundles only**, `withElementSelector` adds `import "react-native-elsel/auto"` at the start of line 1 of your app's entry file (`main` in package.json, so Expo Router's `expo-router/entry` works too). That module wraps every root with `AppRegistry.setWrapperComponentProvider`. It hands everything else to your existing babel transformer (SVG, NativeWind, Sentry, …). Production bundles contain no elsel code at all.
@@ -41,7 +39,7 @@ Want options or a specific placement? Wrap manually; a manual `<ElementSelector>
 ```tsx
 import { ElementSelector } from 'react-native-elsel'
 
-<ElementSelector longPress={{ touches: 2 }}>
+<ElementSelector longPress={{ touches: 2 }} button={false}>
   <RootNavigator />
 </ElementSelector>
 ```
@@ -78,22 +76,26 @@ You can skip MCP entirely. Every Send to AI also writes plain files, so you can 
 
 | How | Where it works |
 | --- | --- |
+| **Floating inspect button** | Everywhere, including simulators and physical devices. Tap it, then tap an element. Drag it anywhere out of the way; it remembers where you put it. |
+| **Pick** button in the panel | Everywhere. Hop to another element without closing the panel. |
 | **Right-click** | Web (hold Shift for the browser's menu), Android with a mouse, iPad with a pointer. Uses pointer events (`button === 2`). |
-| **Long-press** (600 ms) | Everywhere, including physical devices and simulators (click and hold). |
-| **Pick** button in the panel | Everywhere. The next tap selects instead of pressing, which is the cleanest way to hop between elements. |
-| **Dev Menu → "Inspect Element (elsel)"** | Bare React Native. Expo Go / dev-client menus don't list custom items; use long-press there. |
+| **Dev Menu → "Inspect Element (elsel)"** | Bare React Native. Expo Go / dev-client menus don't list custom items; use the floating button there. |
+| **Long-press** (opt-in) | Everywhere, once enabled with `longPress`. See below. |
 
-**iOS Simulator:** the Simulator turns Mac mouse clicks into touches, so a right-click never reaches the app. Use long-press there, then **Pick** to move between elements.
+While picking, a layer covers your app, so the tap that selects an element never reaches it: no buttons fire, no navigation happens.
 
-**Long-press and your own buttons:** elsel only *observes* touches; it never takes them over. So a `Pressable` without `onLongPress` still fires `onPress` when you release. If that gets in the way, use a two-finger long-press: `longPress={{ touches: 2 }}`.
+**iOS Simulator:** the Simulator turns Mac mouse clicks into touches, so a right-click never reaches the app. Use the floating button.
+
+**Long-press and your own buttons:** long-press is off by default. elsel only observes touches, and React Native only lets one view take a touch from another when a finger lands or moves. So once a long-press fires, elsel takes over the touch on the next move and the app's press is cancelled. A hold that never moves at all (typical of click-and-hold in a simulator) still reaches your `Pressable`, which fires `onPress` on release. `longPress={{ touches: 2 }}` has no such gap: elsel takes over the moment the second finger lands.
 
 ## Options
 
 ```tsx
 <ElementSelector
   enabled={__DEV__}                        // default: __DEV__
+  button                                   // floating inspect button, default: true
   rightClick                               // default: true
-  longPress={{ duration: 600, touches: 1 }} // or false
+  longPress={{ duration: 600, touches: 2 }} // or true for one finger; default: false
   devMenu                                  // default: true
   devServerUrl="http://192.168.1.4:8081"   // default: read from the bundle URL
   onSelect={(selection) => {}}             // every pick, as JSON

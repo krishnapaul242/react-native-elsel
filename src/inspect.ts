@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
-import { currentFiber, hostDescendants, type Fiber } from './fiber';
+import { Platform, StyleSheet } from 'react-native';
+import { currentFiber, HostComponent, hostDescendants, type Fiber } from './fiber';
 import type { Frame } from './types';
 
 declare const nativeFabricUIManager: any;
@@ -21,12 +21,81 @@ function fiberOfDomNode(node: any): Fiber | null {
   return null;
 }
 
+const HostText = 6;
+const Offscreen = 22;
+const MAX_VISITED = 8000;
+
+// Fabric's measure() answers synchronously from the shadow tree.
+function measureSync(fiber: Fiber): Frame | null {
+  const node = fiber.stateNode?.node;
+  if (!node) return null;
+  let frame: Frame | null = null;
+  nativeFabricUIManager.measure(node, (_x: number, _y: number, width: number, height: number, pageX: number, pageY: number) => {
+    frame = { x: pageX, y: pageY, width, height };
+  });
+  return frame;
+}
+
 /**
- * Find the deepest host fiber under (x, y), relative to `root`. Uses the same
- * renderer hook as React Native's built-in element inspector, with a direct
- * Fabric fallback.
+ * Walk the app's host views the way a real touch is routed: later siblings
+ * paint on top, and views that can't receive touches are skipped along with
+ * their children (display none, opacity 0, pointerEvents none, inactive
+ * react-native-screens screens, hidden Activity/Suspense trees, and anything
+ * clipped away by overflow: hidden). Fabric's findNodeAtPoint only compares
+ * layout boxes, so it happily returns invisible overlays and screens that are
+ * mounted but not shown.
+ */
+function hitTestTree(root: any, x: number, y: number): Fiber | null {
+  if (typeof nativeFabricUIManager === 'undefined' || typeof nativeFabricUIManager.measure !== 'function') return null;
+  const handle = fiberOfPublicInstance(root);
+  if (!handle) return null;
+  const rootFiber = currentFiber(handle);
+  const origin = measureSync(rootFiber);
+  if (!origin) return null;
+  const px = x + origin.x;
+  const py = y + origin.y;
+  let best: Fiber | null = null;
+  let visited = 0;
+
+  const visit = (fiber: Fiber | null) => {
+    for (let node = fiber; node && visited < MAX_VISITED; node = node.sibling) {
+      visited++;
+      if (node.tag === HostText) continue;
+      if (node.tag === Offscreen && (node.memoizedProps as any)?.mode === 'hidden') continue;
+      if (node.tag !== HostComponent) {
+        visit(node.child);
+        continue;
+      }
+      const props: any = node.memoizedProps ?? {};
+      const style: any = StyleSheet.flatten(props.style) ?? {};
+      const pointerEvents = props.pointerEvents ?? style.pointerEvents;
+      if (style.display === 'none' || style.opacity === 0 || pointerEvents === 'none') continue;
+      if (props.activityState === 0) continue; // react-native-screens: inactive screen
+      const frame = measureSync(node);
+      const inside =
+        frame != null && px >= frame.x && px <= frame.x + frame.width && py >= frame.y && py <= frame.y + frame.height;
+      const clips = style.overflow === 'hidden' || style.overflow === 'scroll' || /ScrollView$/.test(String(node.type));
+      if (!inside && clips) continue;
+      if (inside && pointerEvents !== 'box-none') best = node;
+      if (pointerEvents !== 'box-only') visit(node.child);
+    }
+  };
+  visit(rootFiber.child);
+  return best;
+}
+
+/**
+ * Find the deepest host fiber under (x, y), relative to `root`. On Fabric this
+ * walks the view tree itself (see hitTestTree); otherwise it uses the same
+ * renderer hook as React Native's built-in element inspector.
  */
 export function hitTest(root: any, x: number, y: number): Promise<Fiber | null> {
+  if (Platform.OS !== 'web') {
+    try {
+      const found = hitTestTree(root, x, y);
+      if (found) return Promise.resolve(currentFiber(found));
+    } catch {}
+  }
   if (Platform.OS === 'web') {
     const doc = (globalThis as any).document;
     const rect = root?.getBoundingClientRect?.();
