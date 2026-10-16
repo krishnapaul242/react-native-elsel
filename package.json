@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "description": "Dev-only element selector for React Native. Right-click or long-press any element to see its component, source location, props and styles, open it in your editor, or hand it to an AI agent.",
   "license": "MIT",
+  "author": "Krishna Paul <krishnapaulmailbox@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/krishnapaul242/react-native-elsel.git"
+  },
+  "homepage": "https://github.com/krishnapaul242/react-native-elsel#readme",
+  "bugs": {
+    "url": "https://github.com/krishnapaul242/react-native-elsel/issues"
+  },
   "main": "src/index.ts",
   "types": "src/index.ts",
   "react-native": "src/index.ts",
